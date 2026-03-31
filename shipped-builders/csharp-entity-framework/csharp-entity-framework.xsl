@@ -35,6 +35,24 @@
             <xsl:otherwise>string</xsl:otherwise>
         </xsl:choose>
     </xsl:template>
+
+    <xsl:template name="property-type">
+        <xsl:param name="xstype" select="@xstype"/>
+        <xsl:param name="minOccurs" select="@minOccurs"/>
+        <xsl:variable name="baseType">
+            <xsl:call-template name="type">
+                <xsl:with-param name="xstype" select="$xstype"/>
+            </xsl:call-template>
+        </xsl:variable>
+        <xsl:choose>
+            <xsl:when test="$minOccurs = '0' and ($baseType = 'int' or $baseType = 'double' or $baseType = 'bool')">
+                <xsl:value-of select="concat($baseType, '?')"/>
+            </xsl:when>
+            <xsl:otherwise>
+                <xsl:value-of select="$baseType"/>
+            </xsl:otherwise>
+        </xsl:choose>
+    </xsl:template>
     
     <!-- Variables for string transformation -->
     <xsl:variable name="lc">abcdefghijklmnopqrstuvwxyz</xsl:variable>
@@ -99,12 +117,7 @@
     <!-- Class template for EnumeratedType with properties -->
     <xsl:template match="a:EnumeratedType">
         <sp/>
-        <item>[Table(&quot;<xsl:value-of select="@name"/>&quot;)]</item>
-        <item>public class <xsl:value-of select="@name"/> {</item>
-        <!-- Default constructor -->
-        <item>    public <xsl:value-of select="@name"/>() { }</item>
-        <!-- ToString override -->
-        <item>    public override string ToString() { return this.GetType().Name; }</item>
+        <item>public static class <xsl:value-of select="@name"/> {</item>
         <!-- Generate enumerated values as constant properties -->
         <xsl:apply-templates select="a:EnumeratedValue"/>
         <item>}</item>
@@ -115,12 +128,12 @@
         <sp/>
         <item>public static readonly System.Type[] allClasses = new System.Type[]</item>
         <list begin="{{" indent="    " delim="," end="}};">
-            <xsl:apply-templates select="a:ComplexType | a:Root | a:EnumeratedType" mode="config"/>
+            <xsl:apply-templates select="a:ComplexType | a:Root" mode="config"/>
         </list>
     </xsl:template>
     
     <!-- In config mode: output each class reference using typeof(...) -->
-    <xsl:template match="a:ComplexType | a:Root | a:EnumeratedType" mode="config">
+    <xsl:template match="a:ComplexType | a:Root" mode="config">
         <item>typeof(<xsl:value-of select="@name"/>)</item>
     </xsl:template>
     
@@ -131,8 +144,9 @@
             <item>    [Key]</item>
         </xsl:if>
         <item>    [Column(&quot;<xsl:value-of select="@name"/>&quot;)]</item>
-        <item>    public <xsl:call-template name="type">
+        <item>    public <xsl:call-template name="property-type">
                     <xsl:with-param name="xstype" select="@xstype"/>
+                    <xsl:with-param name="minOccurs" select="@minOccurs"/>
         </xsl:call-template><xsl:text> </xsl:text>
                 <xsl:call-template name="capitalise">
                     <xsl:with-param name="name" select="@name"/>
@@ -144,7 +158,14 @@
         <xsl:choose>
             <!-- Single property when maxOccurs is missing or equals '1' -->
             <xsl:when test="not(@maxOccurs) or @maxOccurs = '1'">
-                <item>    [ForeignKey(&quot;<xsl:value-of select="@name"/>&quot;)]</item>
+                <item>    [Column(&quot;<xsl:value-of select="@name"/>&quot;)]</item>
+                <item>    public <xsl:value-of select="$mridType"/> <xsl:text> </xsl:text>
+                        <xsl:call-template name="capitalise">
+                            <xsl:with-param name="name" select="concat(@name, 'MRID')"/>
+                        </xsl:call-template> { get; set; }</item>
+                <item>    [ForeignKey(&quot;<xsl:call-template name="capitalise">
+                            <xsl:with-param name="name" select="concat(@name, 'MRID')"/>
+                        </xsl:call-template>&quot;)]</item>
                 <item>    public virtual <xsl:value-of select="@type"/>  <xsl:text> </xsl:text>
                         <xsl:call-template name="capitalise">
                             <xsl:with-param name="name" select="@name"/>
@@ -152,7 +173,6 @@
             </xsl:when>
             <!-- Otherwise, generate a collection property -->
             <xsl:otherwise>
-                <item>    [ForeignKey(&quot;<xsl:value-of select="@name"/>&quot;)]</item>
                 <item>    public virtual ICollection&lt;<xsl:value-of select="@type"/>&gt; 
                         <xsl:call-template name="capitalise">
                             <xsl:with-param name="name" select="@name"/>

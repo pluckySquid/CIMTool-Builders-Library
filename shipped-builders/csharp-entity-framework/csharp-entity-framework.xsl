@@ -166,6 +166,7 @@
     
     <!-- Property template for a:Instance and a:Reference (navigation properties) -->
     <xsl:template match="a:Instance | a:Reference">
+        <xsl:variable name="inversePropertyName" select="substring-after(substring-after(@inverseBaseProperty, '#'), '.')"/>
         <xsl:choose>
             <!-- Single property when maxOccurs is missing or equals '1' -->
             <xsl:when test="not(@maxOccurs) or @maxOccurs = '1'">
@@ -177,6 +178,9 @@
                 <item>    [ForeignKey(&quot;<xsl:call-template name="capitalise">
                             <xsl:with-param name="name" select="concat(@name, 'MRID')"/>
                         </xsl:call-template>&quot;)]</item>
+                <xsl:if test="string-length($inversePropertyName) &gt; 0">
+                    <item>    [InverseProperty(&quot;<xsl:value-of select="$inversePropertyName"/>&quot;)]</item>
+                </xsl:if>
                 <item>    public virtual <xsl:value-of select="@type"/>  <xsl:text> </xsl:text>
                         <xsl:call-template name="capitalise">
                             <xsl:with-param name="name" select="@name"/>
@@ -184,10 +188,13 @@
             </xsl:when>
             <!-- Otherwise, generate a collection property -->
             <xsl:otherwise>
+                <xsl:if test="string-length($inversePropertyName) &gt; 0">
+                    <item>    [InverseProperty(&quot;<xsl:value-of select="$inversePropertyName"/>&quot;)]</item>
+                </xsl:if>
                 <item>    public virtual ICollection&lt;<xsl:value-of select="@type"/>&gt; 
                         <xsl:call-template name="capitalise">
                             <xsl:with-param name="name" select="@name"/>
-                        </xsl:call-template> { get; set; }</item>
+                        </xsl:call-template> { get; set; } = new List&lt;<xsl:value-of select="@type"/>&gt;();</item>
             </xsl:otherwise>
         </xsl:choose>
     </xsl:template>

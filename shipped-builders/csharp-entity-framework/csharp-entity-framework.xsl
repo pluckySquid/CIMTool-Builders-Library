@@ -89,6 +89,7 @@
     <!-- Class template for ComplexType and Root with properties -->
     <xsl:template match="a:ComplexType | a:Root">
         <xsl:variable name="super" select="a:SuperType[1]"/>
+        <xsl:variable name="hasMrid" select="a:Simple[@name = 'mRID'] or a:Domain[@name = 'mRID']"/>
         <item>[Table(&quot;<xsl:value-of select="@name"/>&quot;)]</item>
         <item>
             public class <xsl:value-of select="@name"/>
@@ -106,6 +107,12 @@
             <item> </item>
             <item>public override string ToString() { return this.GetType().Name; }</item>
             <item> </item>
+            <xsl:if test="not($super) and not($hasMrid)">
+                <item>    [Key]</item>
+                <item>    [DatabaseGenerated(DatabaseGeneratedOption.Identity)]</item>
+                <item>    public int Id { get; set; }</item>
+                <item> </item>
+            </xsl:if>
             <xsl:apply-templates select="a:Simple | a:Domain | a:Instance | a:Reference | a:Enumerated"/>
         </list>
         <item>}</item>
@@ -117,9 +124,13 @@
     <!-- Class template for EnumeratedType with properties -->
     <xsl:template match="a:EnumeratedType">
         <sp/>
-        <item>public static class <xsl:value-of select="@name"/> {</item>
-        <!-- Generate enumerated values as constant properties -->
-        <xsl:apply-templates select="a:EnumeratedValue"/>
+        <item>[Table(&quot;<xsl:value-of select="@name"/>&quot;)]</item>
+        <item>public class <xsl:value-of select="@name"/> {</item>
+        <item>    public <xsl:value-of select="@name"/>() { }</item>
+        <item>    public override string ToString() { return this.GetType().Name; }</item>
+        <item>    [Key]</item>
+        <item>    [Column(&quot;name&quot;)]</item>
+        <item>    public string Name { get; set; }</item>
         <item>}</item>
     </xsl:template>
     
@@ -128,12 +139,12 @@
         <sp/>
         <item>public static readonly System.Type[] allClasses = new System.Type[]</item>
         <list begin="{{" indent="    " delim="," end="}};">
-            <xsl:apply-templates select="a:ComplexType | a:Root" mode="config"/>
+            <xsl:apply-templates select="a:ComplexType | a:Root | a:EnumeratedType" mode="config"/>
         </list>
     </xsl:template>
     
     <!-- In config mode: output each class reference using typeof(...) -->
-    <xsl:template match="a:ComplexType | a:Root" mode="config">
+    <xsl:template match="a:ComplexType | a:Root | a:EnumeratedType" mode="config">
         <item>typeof(<xsl:value-of select="@name"/>)</item>
     </xsl:template>
     
@@ -189,14 +200,6 @@
                     <xsl:call-template name="capitalise">
                         <xsl:with-param name="name" select="@name"/>
                     </xsl:call-template> { get; set; }</item>
-    </xsl:template>
-    
-    <!-- Template for enumerated values inside an EnumeratedType -->
-    <xsl:template match="a:EnumeratedValue">
-        <item>    public const string 
-                    <xsl:call-template name="capitalise">
-                        <xsl:with-param name="name" select="@name"/>
-                    </xsl:call-template> = &quot;<xsl:value-of select="@name"/>&quot;;</item>
     </xsl:template>
     
     <!-- Suppress text nodes -->
